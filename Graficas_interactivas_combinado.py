@@ -2,6 +2,24 @@ import os
 import glob
 import pandas as pd
 import plotly.graph_objs as go
+import matplotlib.pyplot as plt
+import numpy as np
+
+import plotly.io as pio
+pio.renderers.default = 'browser'
+
+        
+def custom_autopct(pct, values):
+    if pct<1: 
+        return ''
+    elif pct>1 and pct <1.5:  
+        return f'{pct:.0f}% \n' 
+    elif 1.5<pct and pct<2 :
+        return f'\n {pct:.0f}%'  
+    else:
+        return f'{pct:.0f}%'
+
+        
 
 def graph_annuals(df):
     df['fecha_dt'] = pd.to_datetime(df['fecha'], errors='coerce')
@@ -26,6 +44,28 @@ def graph_annuals(df):
         legend_title_text='Variable'
     )
     fig.show()
+    
+    months = df['fecha_dt'].dt.month_name()
+    
+    fig_pie, ax_pie = plt.subplots(figsize=(5, 5))
+    wedges, texts, autotexts = ax_pie.pie(df["w_med"], startangle=90, autopct=lambda pct: custom_autopct(pct, df["w_med"]))
+
+    for i, wedge in enumerate(wedges):
+        angle = (wedge.theta2 + wedge.theta1) / 2
+        x = np.cos(np.radians(angle))
+        y = np.sin(np.radians(angle))
+
+        ax_pie.text(
+            x * 1.31, y * 1.1,
+            months[i],
+            ha='center', va='center', fontsize=12, color='black'
+        )
+
+    ax_pie.set_aspect('equal')
+
+    for autotext in autotexts:
+        autotext.set_fontsize(11)
+    plt.show()
 
 def graph_daily(df):
     df['fecha_dt'] = pd.to_datetime(df['fecha'], errors='coerce')
@@ -36,6 +76,7 @@ def graph_daily(df):
         return
 
     station = df["estacion"].iloc[0]
+
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=df['fecha_dt'], y=df['velmedia'], mode='lines+markers', name='Vel. media'))
@@ -50,6 +91,59 @@ def graph_daily(df):
         legend_title_text='Variable'
     )
     fig.show()
+    
+    months = df['fecha_dt'].dt.month_name()
+
+    fig_pie, ax_pie = plt.subplots(figsize=(5, 5))
+    wedges, texts, autotexts = ax_pie.pie(df["velmedia"], startangle=90, autopct=lambda pct: custom_autopct(pct, df["velmedia"]))
+
+    for i, wedge in enumerate(wedges):
+        angle = (wedge.theta2 + wedge.theta1) / 2
+        x = np.cos(np.radians(angle))
+        y = np.sin(np.radians(angle))
+
+        ax_pie.text(
+            x * 1.31, y * 1.1,
+            months[i],
+            ha='center', va='center', fontsize=12, color='black'
+        )
+
+    ax_pie.set_aspect('equal')
+
+    for autotext in autotexts:
+        autotext.set_fontsize(11)
+    plt.show()
+    
+    # --- GRAPH 2 : velmedia with direction
+    df['dir_10'] = (df['dir_racha'] // 10 * 10).astype(int)
+    polar_df = df.groupby('dir_10')['velmedia'].mean().reset_index()
+    polar_df = polar_df.sort_values(by='dir_10')
+
+    all_dirs = pd.DataFrame({'dir_10': np.arange(0, 360, 10)})
+    polar_df = pd.merge(all_dirs, polar_df, on='dir_10', how='left').fillna(0)
+
+    fig_polar = go.Figure()
+
+    fig_polar.add_trace(go.Scatterpolar(
+        r=polar_df['velmedia'],
+        theta=polar_df['dir_10'],
+        mode='lines+markers',
+        name='Vel. media',
+        fill='toself',
+        marker=dict(color='blue')
+    ))
+
+    fig_polar.update_layout(
+        title=f"Distribución direccional - Velocidad media ({station})",
+        polar=dict(
+            angularaxis=dict(direction="clockwise", rotation=90),
+            radialaxis=dict(title='m/s')
+        ),
+        height=500,
+        showlegend=False
+    )
+
+    fig_polar.show()
 
 def graph_extremos(df):
     df['fecha_dt'] = pd.to_datetime(df['fecha_ocurrencia'], errors='coerce')
